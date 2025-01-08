@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>WebRTC Test with Capture Photo</title>
+    <style>
+        #photo {
+            display: none;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            max-width: 640px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>WebRTC Test</h2>
+    <video id="video" width="640" height="480" autoplay></video>
+    <br>
+    <button id="captureButton">Tirar Foto</button>
+    <br>
+    <img id="photo" src="" alt="Foto capturada">
+
+    <script>
+        let pc = new RTCPeerConnection();
+        let videoElement = document.getElementById("video");
+        let captureButton = document.getElementById("captureButton");
+        let photoElement = document.getElementById("photo");
+        let videoStream;
+        let isVideoReady = false;
+
+        // Função para exibir o vídeo local
+        function gotStream(stream) {
+            videoElement.srcObject = stream;
+            videoStream = stream;
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            isVideoReady = true;  // Vídeo pronto para captura
+        }
+
+        // Captura o vídeo local
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(gotStream)
+            .catch(e => console.error('Erro ao acessar o vídeo: ', e));
+
+        // Recebe a oferta do servidor (copie e cole a oferta gerada no servidor Python)
+        const offer = prompt("Cole aqui a oferta gerada pelo servidor:");
+
+        if (offer) {
+            pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(offer)));
+
+            // Responde com a resposta
+            pc.createAnswer()
+                .then(answer => {
+                    pc.setLocalDescription(answer);
+                    console.log("Resposta:", answer.sdp);
+                })
+                .catch(e => console.error('Erro ao criar a resposta:', e));
+
+            // Exibe o vídeo remoto
+            pc.ontrack = function (event) {
+                if (event.streams && event.streams[0]) {
+                    videoElement.srcObject = event.streams[0];
+                }
+            };
+        }
+
+        // Função para capturar uma foto
+        captureButton.addEventListener('click', function () {
+            if (!isVideoReady) {
+                alert("O vídeo não está pronto para captura!");
+                return;
+            }
+
+            // Cria um canvas temporário para capturar o frame do vídeo
+            let canvas = document.createElement("canvas");
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            let ctx = canvas.getContext("2d");
+
+            // Desenha o frame atual no canvas
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+            // Converte o canvas em uma imagem
+            let dataUrl = canvas.toDataURL("image/png");
+
+            // Exibe a foto na página
+            photoElement.src = dataUrl;
+            photoElement.style.display = "block";  // Torna a foto visível
+        });
+    </script>
+</body>
+
+</html>
