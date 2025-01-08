@@ -27,25 +27,16 @@
         let captureButton = document.getElementById("captureButton");
         let photoElement = document.getElementById("photo");
         let videoStream;
-        let isVideoReady = false;
 
-        // Função para exibir o vídeo local
-        function gotStream(stream) {
-            videoElement.srcObject = stream;
-            videoStream = stream;
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
-            isVideoReady = true;  // Vídeo pronto para captura
-        }
+        // Conectar-se ao servidor WebSocket
+        const socket = new WebSocket("ws://localhost:8765");
 
-        // Captura o vídeo local
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(gotStream)
-            .catch(e => console.error('Erro ao acessar o vídeo: ', e));
+        socket.onmessage = function (event) {
+            // Recebe a oferta do servidor
+            const data = JSON.parse(event.data);
+            const offer = data.offer;
 
-        // Recebe a oferta do servidor (copie e cole a oferta gerada no servidor Python)
-        const offer = prompt("Cole aqui a oferta gerada pelo servidor:");
-
-        if (offer) {
+            // Define a descrição remota (a oferta recebida)
             pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(offer)));
 
             // Responde com a resposta
@@ -54,7 +45,7 @@
                     pc.setLocalDescription(answer);
                     console.log("Resposta:", answer.sdp);
                 })
-                .catch(e => console.error('Erro ao criar a resposta:', e));
+                .catch(e => console.error(e));
 
             // Exibe o vídeo remoto
             pc.ontrack = function (event) {
@@ -62,16 +53,21 @@
                     videoElement.srcObject = event.streams[0];
                 }
             };
+        };
+
+        // Captura o vídeo local
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(gotStream)
+            .catch(e => console.error(e));
+
+        function gotStream(stream) {
+            videoElement.srcObject = stream;
+            videoStream = stream;
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
         }
 
         // Função para capturar uma foto
         captureButton.addEventListener('click', function () {
-            if (!isVideoReady) {
-                alert("O vídeo não está pronto para captura!");
-                return;
-            }
-
-            // Cria um canvas temporário para capturar o frame do vídeo
             let canvas = document.createElement("canvas");
             canvas.width = videoElement.videoWidth;
             canvas.height = videoElement.videoHeight;

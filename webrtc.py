@@ -1,8 +1,8 @@
 import asyncio
+import websockets
 from aiortc import RTCPeerConnection, VideoStreamTrack
+import json
 import cv2
-import streamlit as st
-from aiortc.contrib.media import MediaPlayer
 
 
 class VideoTrack(VideoStreamTrack):
@@ -18,24 +18,33 @@ class VideoTrack(VideoStreamTrack):
 
 async def create_offer():
     pc = RTCPeerConnection()
-
     video_track = VideoTrack()
     pc.addTrack(video_track)
 
     offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
 
-    return pc, offer
+    return offer.sdp
+
+
+async def handle_client(websocket, path):
+    # Cria a oferta
+    offer = await create_offer()
+
+    # Envia a oferta para o cliente via WebSocket
+    await websocket.send(json.dumps({"offer": offer}))
+
+    print("Oferta enviada para o cliente")
+
+    # Mantenha a conexão aberta
+    await websocket.wait_closed()
+
+# Inicia o servidor WebSocket
 
 
 async def main():
-    pc, offer = await create_offer()
-
-    st.title("WebRTC Offer")
-    st.text("Oferta gerada pelo servidor:")
-    st.text(offer.sdp)
-
-    await asyncio.sleep(30)
+    server = await websockets.serve(handle_client, "localhost", 8765)
+    await server.wait_closed()
 
 if __name__ == "__main__":
     asyncio.run(main())
